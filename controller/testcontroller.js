@@ -55,21 +55,26 @@ export const redirect = async (req, res, next) => {
 
         // Server-side Tracking
         const ip = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
-        const userAgent = req.headers['user-agent'] || 'Unknown';
-        const purpose = req.headers['purpose'] || req.headers['sec-purpose'] || req.headers['x-purpose'];
+        const userAgent = (req.headers['user-agent'] || 'Unknown').toLowerCase();
+        const purpose = (req.headers['purpose'] || req.headers['sec-purpose'] || req.headers['x-purpose'] || '').toLowerCase();
 
-        // Ignore Prefetch requests
-        if (purpose === 'prefetch') return next();
+        // 1. Ignore ANY Prefetch/Preview/Check requests
+        if (purpose.includes('prefetch') || purpose.includes('preview') || purpose.includes('check')) return next();
+
+        // 2. Ignore Bots and Vercel internal checks
+        const botKeywords = ['bot', 'crawler', 'spider', 'vercel', 'screenshot', 'headless', 'slurp', 'inspect'];
+        const isBot = botKeywords.some(keyword => userAgent.includes(keyword));
+        if (isBot) return next();
 
         const country = await getCountryFromIP(ip);
         const parser = new UAParser(userAgent);
 
-        // Cooldown check (prevent double clicks within 2 seconds)
+        // 3. Cooldown check (prevent double clicks within 5 seconds for same IP)
         const recentClick = await prisma.click.findFirst({
             where: {
                 linkId: link.id,
                 ip: ip,
-                timestamp: { gte: new Date(Date.now() - 2000) }
+                timestamp: { gte: new Date(Date.now() - 5000) }
             }
         });
 
