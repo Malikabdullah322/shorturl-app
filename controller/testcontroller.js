@@ -69,51 +69,51 @@ export const redirect = async (req, res, next) => {
             return res.status(410).send("<h1>Error: Link Expired</h1>");
         }
 
-        // Server-side Tracking
+        // 1. Identify Client Metadata
         const ip = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
-        const userAgent = (req.headers['user-agent'] || 'Unknown').toLowerCase();
+        const userAgent = req.headers['user-agent'] || 'Unknown';
         const purpose = (req.headers['purpose'] || req.headers['sec-purpose'] || req.headers['x-purpose'] || '').toLowerCase();
 
-        // 1. Ignore ANY Prefetch/Preview/Check requests
+        // 2. Ignore obvious Prefetch/Preview/Check requests early
         if (purpose.includes('prefetch') || purpose.includes('preview') || purpose.includes('check')) return next();
 
-        // 2. Ignore Bots and Vercel internal checks
-        const botKeywords = ['bot', 'crawler', 'spider', 'vercel', 'screenshot', 'headless', 'slurp', 'inspect'];
-        const isBot = botKeywords.some(keyword => userAgent.includes(keyword));
-        if (isBot) return next();
-
-        const country = await getCountryFromIP(ip);
-        const parser = new UAParser(userAgent);
-
-        // 3. Cooldown check (prevent double clicks within 5 seconds for same IP)
-        const recentClick = await prisma.click.findFirst({
-            where: {
-                linkId: link.id,
-                ip: ip,
-                timestamp: { gte: new Date(Date.now() - 5000) }
-            }
-        });
-
-        if (!recentClick) {
-            await prisma.click.create({
-                data: {
-                    linkId: link.id,
-                    ip,
-                    country,
-                    browser: parser.getBrowser().name || 'Unknown',
-                    os: parser.getOS().name || 'Unknown'
-                }
-            });
-        }
-
+        // 3. Serve the loader page which will trigger the REAL click via JavaScript
         res.send(`
         <!DOCTYPE html><html><head><title>Redirecting...</title>
-        <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;background:#F3F4F6;margin:0;}
-        .loader{width:48px;height:48px;border:5px solid #FFF;border-bottom-color:#3B82F6;border-radius:50%;animation:rot 1s linear infinite;}
-        @keyframes rot{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style></head>
-        <body><div class="loader"></div><script>
-            setTimeout(() => { window.location.href="${link.originalUrl}"; }, 500);
-        </script></body></html>`);
+        <style>
+            body{font-family:sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:#F3F4F6;margin:0;gap:20px;}
+            .loader{width:48px;height:48px;border:5px solid #FFF;border-bottom-color:#3B82F6;border-radius:50%;animation:rot 1s linear infinite;}
+            .text{font-weight:600;color:#64748B;font-size:14px;letter-spacing:0.5px;}
+            @keyframes rot{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+        </style></head>
+        <body>
+            <div class="loader"></div>
+            <div class="text">Redirecting you securely...</div>
+            <script>
+                (async () => {
+                    const trackingData = {
+                        linkId: ${link.id},
+                        ip: "${ip}",
+                        userAgent: navigator.userAgent
+                    };
+                    
+                    try {
+                        // Trigger tracking only for browsers that execute JS (Real Users)
+                        await fetch('/api/track-click', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(trackingData),
+                            keepalive: true
+                        });
+                    } catch (e) {
+                        console.warn("Tracking failed, proceeding with redirect.");
+                    } finally {
+                        // Perform the final redirect
+                        window.location.href = "${link.originalUrl}";
+                    }
+                })();
+            </script>
+        </body></html>`);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
