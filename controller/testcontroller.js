@@ -23,6 +23,22 @@ export const shorten = async (req, res) => {
 
         if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
 
+        // Basic validation for double dots or empty host segments
+        try {
+            const parsed = new URL(url);
+            const host = parsed.hostname;
+            if (!host || host.includes('..') || !host.includes('.') || /[^a-zA-Z0-9.-]/.test(host)) {
+                return res.status(400).json({ error: "Invalid URL format" });
+            }
+        } catch (e) {
+            return res.status(400).json({ error: "Invalid URL" });
+        }
+
+        // Global check for suspicious consecutive characters like ;; or ,,
+        if (/[,;]{2,}/.test(url)) {
+            return res.status(400).json({ error: "Invalid URL format (avoid consecutive symbols)" });
+        }
+
         const shortCode = customAlias || nanoid(6);
         if (customAlias) {
             const existing = await prisma.link.findUnique({ where: { shortCode } });
@@ -48,7 +64,7 @@ export const redirect = async (req, res, next) => {
         const link = await prisma.link.findUnique({ where: { shortCode: code } });
 
         if (!link) return next();
-        
+
         if (link.expiresAt && new Date() > new Date(link.expiresAt)) {
             return res.status(410).send("<h1>Error: Link Expired</h1>");
         }
@@ -213,4 +229,30 @@ export const getAllClicks = async (req, res) => {
         });
         res.json({ clicks });
     } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+export const deleteLink = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const linkId = parseInt(id);
+
+        const link = await prisma.link.findFirst({
+            where: { id: linkId, userId: req.user.id }
+        });
+
+        if (!link) {
+            return res.status(404).json({ error: "Link not found or unauthorized" });
+        }
+
+        // Delete associated clicks and the link in a transaction
+        await prisma.$transaction([
+            prisma.click.deleteMany({ where: { linkId } }),
+            prisma.link.delete({ where: { id: linkId } })
+        ]);
+
+        res.json({ message: "Link deleted successfully" });
+    } catch (e) {
+        console.error("DEBUG: Delete failed for ID", id, e);
+        res.status(500).json({ error: e.message });
+    }
 };

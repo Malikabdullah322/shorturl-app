@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Search, Globe, Activity, Copy, ExternalLink, BarChart2 } from 'lucide-react';
+import { Search, Globe, Activity, Copy, ExternalLink, BarChart2, Trash2 } from 'lucide-react';
 
 const Dashboard = () => {
   const [links, setLinks] = useState([]);
@@ -23,6 +24,74 @@ const Dashboard = () => {
     } catch (err) {
       console.error("Dashboard failed to load:", err);
     }
+  };
+
+  const performDelete = async (id) => {
+    try {
+      await axios.delete(`/links/${id}`);
+      setLinks(links.filter(l => l.id !== id));
+      setStats(prev => ({ ...prev, totalLinks: prev.totalLinks - 1 }));
+      toast.success("Link deleted successfully!");
+    } catch (err) {
+      console.error("Delete failed:", err);
+      const errMsg = err.response?.data?.error || "Failed to delete link";
+      toast.error(errMsg);
+    }
+  };
+
+  const handleDelete = (id) => {
+    toast((t) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: '14px', color: '#0F172A' }}>
+          Delete this link permanently?
+        </p>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              performDelete(id);
+            }}
+            style={{
+              background: '#EF4444',
+              color: 'white',
+              border: 'none',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              fontSize: '12px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              transition: 'opacity 0.2s'
+            }}
+          >
+            Yes, Delete
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            style={{
+              background: '#F1F5F9',
+              color: '#64748B',
+              border: '1px solid #E2E8F0',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              fontSize: '12px',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      style: {
+        borderRadius: '20px',
+        padding: '16px',
+        background: '#fff',
+        border: '1px solid #E2E8F0',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
+      }
+    });
   };
 
   const fetchCountries = async () => {
@@ -54,7 +123,7 @@ const Dashboard = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
-      alert("Link copied to clipboard!");
+      toast.success("Link copied to clipboard!");
     });
   };
 
@@ -110,9 +179,9 @@ const Dashboard = () => {
             <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
               <th style={{ textAlign: 'left', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Short Link</th>
               <th style={{ textAlign: 'left', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Original URL</th>
-              <th style={{ textAlign: 'left', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Clicks</th>
-              <th style={{ textAlign: 'left', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Status</th>
-              <th style={{ textAlign: 'left', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Actions</th>
+              <th style={{ textAlign: 'right', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Clicks</th>
+              <th style={{ textAlign: 'right', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Status</th>
+              <th style={{ textAlign: 'right', padding: '18px 32px', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -132,8 +201,8 @@ const Dashboard = () => {
                       {link.originalUrl}
                     </div>
                   </td>
-                  <td style={{ padding: '24px 32px', fontWeight: 700 }}>{link.clicks.toLocaleString()}</td>
-                  <td style={{ padding: '24px 32px' }}>
+                  <td style={{ padding: '24px 32px', textAlign: 'right', fontWeight: 700 }}>{link.clicks.toLocaleString()}</td>
+                  <td style={{ padding: '24px 32px', textAlign: 'right' }}>
                     <span style={{
                       display: 'inline-flex',
                       padding: '6px 14px',
@@ -147,7 +216,7 @@ const Dashboard = () => {
                     </span>
                   </td>
                   <td style={{ padding: '24px 32px' }}>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                       <Link to={`/stats?code=${link.shortCode}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '12px', background: '#F8FAFC', color: '#64748B', border: '1px solid #F1F5F9', transition: 'all 0.2s' }} title="View Analytics">
                         <Activity size={18} />
                       </Link>
@@ -157,6 +226,9 @@ const Dashboard = () => {
                       <a href={`/${link.shortCode}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '12px', background: '#F8FAFC', color: '#64748B', border: '1px solid #F1F5F9' }} title="Open Link">
                         <ExternalLink size={18} />
                       </a>
+                      <button onClick={() => handleDelete(link.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '12px', background: '#FEF2F2', color: '#EF4444', border: '1px solid #FEE2E2', cursor: 'pointer' }} title="Delete Link">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </td>
                 </tr>

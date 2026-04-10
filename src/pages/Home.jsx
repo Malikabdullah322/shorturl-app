@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import { Link as LinkIcon, Calendar, ArrowRight, Check, Copy } from 'lucide-react';
 
@@ -9,23 +10,52 @@ const Home = () => {
   const [expiry, setExpiry] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const handleClear = () => {
+    setUrl('');
+    setResult(null);
+    setCustomAlias('');
+    setExpiry('');
+    setError('');
+    setCopied(false);
+  };
 
   useEffect(() => {
     setBaseUrl(window.location.host + '/');
   }, []);
 
   const handleShorten = async () => {
-    if (!url) return;
-    
-    const urlPattern = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/.*)?$/;
-    if (!urlPattern.test(url)) {
+    let checkUrl = url.trim();
+    if (!checkUrl) return;
+
+    if (!/^https?:\/\//i.test(checkUrl)) checkUrl = `https://${checkUrl}`;
+
+    try {
+      const parsed = new URL(checkUrl);
+      const host = parsed.hostname;
+
+      // Stricter hostname validation: No double dots, must have a dot, and only allow valid characters (LDH rule)
+      if (!host || host.includes('..') || !host.includes('.') || host.startsWith('.') || host.endsWith('.') || /[^a-zA-Z0-9.-]/.test(host)) {
+        throw new Error();
+      }
+
+      const tld = host.split('.').pop();
+      if (!tld || tld.length < 2) throw new Error();
+
+    } catch (err) {
       setError('Please enter a valid URL (e.g., example.com)');
       return;
     }
-    
+
+    // Global check for suspicious consecutive characters like ;; or ,,
+    if (/[,;]{2,}/.test(url)) {
+      setError('Please enter a valid URL (avoid consecutive symbols like ;; or ,,)');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
@@ -36,9 +66,10 @@ const Home = () => {
       });
       if (response.data.link) {
         setResult(response.data.link);
+        toast.success('Link shortened successfully!');
       }
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.error || 'Failed to shorten.'));
+      toast.error(err.response?.data?.error || 'Failed to shorten URL');
     } finally {
       setLoading(false);
     }
@@ -116,7 +147,7 @@ const Home = () => {
 
         {error && (
           <div style={{ color: 'var(--error)', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px', marginTop: '-12px' }}>
-            <span style={{ display: 'inline-block', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--error)', color: 'white', textAlign: 'center', lineHeight: '16px', fontSize: '12px' }}>!</span> 
+            <span style={{ display: 'inline-block', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--error)', color: 'white', textAlign: 'center', lineHeight: '16px', fontSize: '12px' }}>!</span>
             {error}
           </div>
         )}
@@ -131,12 +162,20 @@ const Home = () => {
               <a href={`/${result.shortCode}`} target="_blank" rel="noreferrer" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', textDecoration: 'none', wordBreak: 'break-all' }}>
                 {window.location.host + '/' + result.shortCode}
               </a>
-              <button
-                onClick={copyToClipboard}
-                style={{ background: 'var(--accent)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
-              >
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={copyToClipboard}
+                  style={{ background: 'var(--accent)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', transition: 'opacity 0.2s' }}
+                >
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  onClick={handleClear}
+                  style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0', padding: '8px 16px', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', transition: 'all 0.2s' }}
+                >
+                  Clear
+                </button>
+              </div>
             </div>
             <Link to={`/stats?code=${result.shortCode}`} style={{ display: 'block', marginTop: '16px', color: '#0369A1', fontSize: '14px', fontWeight: 600, textDecoration: 'none', textAlign: 'right' }}>
               View Analytics →
@@ -184,5 +223,7 @@ const Home = () => {
     </main>
   );
 };
+
+
 
 export default Home;

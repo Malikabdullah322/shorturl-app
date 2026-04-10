@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../config/db.js";
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30m" });
 };
 
 export const register = async (req, res) => {
@@ -24,7 +24,7 @@ export const register = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 30 * 60 * 1000, // 30 minutes
       sameSite: "strict",
       path: "/"
     });
@@ -50,7 +50,7 @@ export const login = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 30 * 60 * 1000, // 30 minutes
       sameSite: "strict",
       path: "/"
     });
@@ -63,8 +63,8 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  res.cookie("token", "", { 
-    httpOnly: true, 
+  res.cookie("token", "", {
+    httpOnly: true,
     expires: new Date(0),
     path: "/" // Ensure path matches exactly
   });

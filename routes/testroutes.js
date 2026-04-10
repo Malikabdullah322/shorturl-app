@@ -1,5 +1,5 @@
 import express from "express";
-import { shorten, redirect, getStats, getAllCountries, getAllClicks, getDashboardData, trackClick } from "../controller/testcontroller.js";
+import { shorten, redirect, getStats, getAllCountries, getAllClicks, getDashboardData, trackClick, deleteLink } from "../controller/testcontroller.js";
 import { register, login, logout, getMe } from "../controller/authController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -28,6 +28,9 @@ router.get("/all-clicks", protect, getAllClicks);
 
 // 5. Track click data from browser
 router.post("/track-click", trackClick);
+
+// 6. Delete a link
+router.delete("/links/:id", protect, deleteLink);
 
 
 export default router;
