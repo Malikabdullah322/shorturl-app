@@ -41,3 +41,5 @@ app.listen(PORT, () => {
     // Keep event loop active (Heartbeat)
     setInterval(() => { }, 60000);
 });
+
+export default app;
