@@ -232,8 +232,8 @@ export const getAllClicks = async (req, res) => {
 };
 
 export const deleteLink = async (req, res) => {
+    const { id } = req.params;
     try {
-        const { id } = req.params;
         const linkId = parseInt(id);
 
         const link = await prisma.link.findFirst({
