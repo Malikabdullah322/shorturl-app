@@ -21,7 +21,7 @@ app.use(cookieParser());
 app.use(express.json());
 
 // 2. Static Files (Serve Frontend in production)
-const distPath = path.join(__dirname, "dist");
+const distPath = path.resolve(__dirname, "dist");
 app.use(express.static(distPath));
 
 // 3. API and Redirection routes
